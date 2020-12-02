@@ -19,10 +19,22 @@ app.get("/ntp/unsplash", rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 1
 }), (req, res) => {
-    axios.get(`https://api.unsplash.com/photos/random?collections=67042424&count=1`, { headers: {
+    axios.get(`https://api.unsplash.com/photos/random?collections=67042424&count=50`, { headers: {
         authorization: `Client-ID ${process.env.UNSPLASH_API_KEY}`
     } })
-        .then(resp => res.send(resp.data))
+        .then(resp => {
+            res.header("X-Attribution-Data", JSON.stringify(resp.data.map((i: any) => { return { 
+                p: i.links.html, 
+                l: i.location.name, 
+                lp: [
+                    i.location.position.latitude, 
+                    i.location.position.longitude
+                ], 
+                usn: i.user.username, 
+                n: i.user.name 
+            } })))
+            res.send(resp.data.map((i: any) => { return i.urls.full }))
+        })
         .catch(e => console.log(e))
 })
 
@@ -31,4 +43,4 @@ app.use((req, res, next) => {
     res.end(`No service found with that name.`)
 })
 
-app.listen(process.env.PORT || 5000);
+app.listen(process.env.PORT || 5001);
