@@ -15,10 +15,6 @@ app.get("/download", (req, res) => {
     if(!req.query.product || !req.query.version || !req.query.os) return res.send("Missing parameters.");
 })
 
-app.use(function(req, res, next) {
-
-  });
-
 app.get("/ntp/unsplash", rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 1
