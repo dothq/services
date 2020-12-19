@@ -2,10 +2,13 @@ import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit'
+import slowDown from 'express-slow-down'
 
 dotenv.config();
 
 const app = express();
+
+app.use(express.json()); 
 
 app.set('trust proxy', 1);
 
@@ -37,9 +40,71 @@ app.get("/ntp/unsplash", rateLimit({
                 usn: i.user.username, 
                 n: i.user.name 
             } })))
-            res.send(resp.data.map((i: any) => { return i.urls.full }))
+            res.send(resp.data.map((i: any) => { return `${i.urls.raw}&q=50&w=1920` }))
         })
         .catch(e => console.log(e))
+})
+
+app.get("/feedback/send", (req, res) => {
+    if(
+        !req.query ||
+        !req.query.version || 
+        !req.query.product ||
+        !req.query.channel
+    ) {
+        res.send(`Missing product information.`)
+    } else {
+        res.sendFile(__dirname + "/send-feedback.html")
+    }
+})
+
+app.post("/feedback/send", slowDown({
+    windowMs: 60 * 60 * 1000,
+    delayAfter: 1,
+    delayMs: 500
+}), (req, res) => {
+    if(!req.body) res.end("");
+    if(!req.body.version) res.status(400).end("");
+    if(!req.body.product) res.status(400).end("");
+    if(!req.body.channel) res.status(400).end("");
+    if(!req.body.feedback) res.status(400).end("");
+
+    const feedbackWebhook: any = process.env.FEEDBACK_WH;
+
+    if(!feedbackWebhook) res.status(400).end("Error.")
+
+    axios.post(feedbackWebhook, {
+        embeds: [
+            {
+                title: "📣  Feedback",
+                color: 3092790,
+                timestamp: new Date().toISOString(),
+                fields: [
+                    {
+                        name: "Product",
+                        value: req.body.product,
+                        inline: true
+                    },
+                    {
+                        name: "Version",
+                        value: req.body.version,
+                        inline: true
+                    },
+                    {
+                        name: "Channel",
+                        value: req.body.channel,
+                        inline: true
+                    },
+                    {
+                        name: "Feedback Content",
+                        value: `\`\`\`${req.body.feedback}\`\`\``,
+                        inline: true
+                    }
+                ]
+            }
+        ]
+    }).then(resp => res.status(200).end("OK"))
+    .catch(resp => res.status(400).end("Error."))
 })
 
 app.use((req, res, next) => {
